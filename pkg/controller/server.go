@@ -2,14 +2,16 @@ package controller
 
 import (
 	"context"
+	"sport-grid-be/pkg/auth"
 	"sport-grid-be/pkg/config"
+	"sport-grid-be/pkg/user"
 
 	logger "github.com/imsab23/platform-be/observability/logging"
 	"github.com/imsab23/platform-be/pkg/http/response"
 	"github.com/imsab23/platform-be/pkg/http/router"
 	chirtr "github.com/imsab23/platform-be/pkg/http/router/chi"
 	"github.com/imsab23/platform-be/pkg/http/server"
-	"github.com/imsab23/platform-be/pkg/middleware/secheaders"
+	authmw "github.com/imsab23/platform-be/pkg/middleware/auth"
 )
 
 type Server struct {
@@ -20,17 +22,15 @@ type Server struct {
 }
 
 type Dependencies struct {
+	UserSvc user.Service
+	AuthSvc auth.Service
 }
 
 func NewServer(deps *Dependencies, cfg *config.Config) (*Server, error) {
 	log, _ := logger.NewLogger("restserver")
 
 	r := chirtr.New(chirtr.Options{
-		Logger: log,
-		SecHeadersConfig: secheaders.Config{
-			HSTSMaxAge:            31536000,
-			HSTSIncludeSubDomains: true,
-		},
+		Logger:               log,
 		EnableRequestLogging: true,
 	})
 
@@ -46,7 +46,12 @@ func (s *Server) registerRoutes() {
 	r := s.router
 
 	r.GET("/", healthHandler)
+	s.NewAuthController(r)
 
+	r.Group("/api/v1", func(g router.Router) {
+		g.Use(chirtr.WrapNetHTTPMiddleware(authmw.New(s.Dependencies.AuthSvc.VerifyToken())))
+		s.NewUserController(g)
+	})
 }
 
 func healthHandler(c *router.Ctx) error {
