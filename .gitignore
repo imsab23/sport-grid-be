@@ -1,2 +1,4 @@
+.github
 .env
-__debug_bin.exe
+**__debug**
+/keys

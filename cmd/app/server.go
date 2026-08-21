@@ -2,9 +2,11 @@ package app
 
 import (
 	"context"
+	"sport-grid-be/pkg/auth"
 	"sport-grid-be/pkg/config"
 	"sport-grid-be/pkg/controller"
-	"sport-grid-be/pkg/infra/storage/postgres"
+	"sport-grid-be/pkg/storage/postgres"
+	"sport-grid-be/pkg/user"
 
 	db "github.com/imsab23/platform-be/infra/storage/postgres"
 	logger "github.com/imsab23/platform-be/observability/logging"
@@ -32,7 +34,20 @@ func NewServer(ctx context.Context) (*Server, error) {
 		return nil, err
 	}
 
-	restServer, err := controller.NewServer(&controller.Dependencies{}, cfg)
+	userSvc, err := user.NewService(db)
+	if err != nil {
+		return nil, err
+	}
+
+	authSvc, err := auth.NewService(userSvc)
+	if err != nil {
+		return nil, err
+	}
+
+	restServer, err := controller.NewServer(&controller.Dependencies{
+		UserSvc: userSvc,
+		AuthSvc: authSvc,
+	}, cfg)
 	if err != nil {
 		return nil, err
 	}
