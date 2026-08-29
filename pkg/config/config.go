@@ -7,6 +7,8 @@ import (
 
 type Config struct {
 	PostgresDB PostgresDB
+	JWT        JWTConfig
+	Server     ServerConfig
 }
 
 func Load() (*Config, error) {
@@ -23,6 +25,8 @@ func Load() (*Config, error) {
 	}
 
 	cfg.postgresDbConfig()
+	cfg.jwtConfig()
+	cfg.serverConfig()
 
 	return cfg, nil
 }

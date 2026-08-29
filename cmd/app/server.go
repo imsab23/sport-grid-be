@@ -5,6 +5,7 @@ import (
 	"sport-grid-be/pkg/auth"
 	"sport-grid-be/pkg/config"
 	"sport-grid-be/pkg/controller"
+	"sport-grid-be/pkg/player"
 	"sport-grid-be/pkg/storage/postgres"
 	"sport-grid-be/pkg/user"
 
@@ -29,24 +30,30 @@ func NewServer(ctx context.Context) (*Server, error) {
 		return nil, err
 	}
 
-	db, err := postgres.InitDB(ctx, cfg)
+	database, err := postgres.InitDB(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	userSvc, err := user.NewService(db)
+	userSvc, err := user.NewService(database)
 	if err != nil {
 		return nil, err
 	}
 
-	authSvc, err := auth.NewService(userSvc)
+	playerSvc, err := player.NewService(database)
+	if err != nil {
+		return nil, err
+	}
+
+	authSvc, err := auth.NewService(userSvc, playerSvc, database, &cfg.JWT)
 	if err != nil {
 		return nil, err
 	}
 
 	restServer, err := controller.NewServer(&controller.Dependencies{
-		UserSvc: userSvc,
-		AuthSvc: authSvc,
+		UserSvc:   userSvc,
+		AuthSvc:   authSvc,
+		PlayerSvc: playerSvc,
 	}, cfg)
 	if err != nil {
 		return nil, err
@@ -57,7 +64,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 
 	return &Server{
 		runner: runner,
-		db:     db,
+		db:     database,
 	}, nil
 }
 

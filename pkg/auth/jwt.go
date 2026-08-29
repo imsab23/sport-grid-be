@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	"sport-grid-be/pkg/config"
+
 	"github.com/imsab23/platform-be/pkg/security/jwt"
 )
 
@@ -65,42 +67,44 @@ func loadEdDSAKeyPair(
 	}, nil
 }
 
-func Init() (cfg jwt.Config, signer *jwt.Signer, verifier *jwt.Verifier, err error) {
-	cfg = jwt.DefaultConfig(
-		"sport-grid",
-		"sport-grid",
-	)
+func Init(cfg *config.JWTConfig) (jwtCfg jwt.Config, signer *jwt.Signer, verifier *jwt.Verifier, err error) {
+	jwtCfg = jwt.DefaultConfig(cfg.Issuer, cfg.Audience)
 
-	kp, err := loadEdDSAKeyPair(
-		"sport-grid",
-		"/home/naeem/Documents/Sam/sport-grid-be/keys/jwt_private.pem",
-		"/home/naeem/Documents/Sam/sport-grid-be/keys/jwt_public.pem",
-	)
+	kp, err := loadEdDSAKeyPair(cfg.KID, cfg.PrivateKeyPath, cfg.PublicKeyPath)
 	if err != nil {
-		return cfg, nil, nil, fmt.Errorf("load JWT key pair: %w", err)
+		return jwtCfg, nil, nil, fmt.Errorf("load JWT key pair: %w", err)
 	}
 
 	provider, err := jwt.NewStaticKeyProvider(kp)
 	if err != nil {
-		return cfg, nil, nil, fmt.Errorf("create key provider: %w", err)
+		return jwtCfg, nil, nil, fmt.Errorf("create key provider: %w", err)
 	}
 
-	signer, err = jwt.NewSigner(cfg, provider)
+	signer, err = jwt.NewSigner(jwtCfg, provider)
 	if err != nil {
-		return cfg, nil, nil, fmt.Errorf("create signer: %w", err)
+		return jwtCfg, nil, nil, fmt.Errorf("create signer: %w", err)
 	}
 
-	verifier, err = jwt.NewVerifier(cfg, provider)
+	verifier, err = jwt.NewVerifier(jwtCfg, provider)
 	if err != nil {
-		return cfg, nil, nil, fmt.Errorf("create verifier: %w", err)
+		return jwtCfg, nil, nil, fmt.Errorf("create verifier: %w", err)
 	}
 
-	return cfg, signer, verifier, nil
+	return jwtCfg, signer, verifier, nil
 }
 
 func (s *service) GenerateToken(user *UserAuth) (string, error) {
 	now := time.Now().UTC()
-	claims := jwt.NewAccessClaims(s.jwtCfg, user.ID, user.ID, "user", user.ClientID, []string{user.Role}, nil, now)
+	claims := jwt.NewAccessClaims(
+		s.jwtCfg,
+		user.ID,
+		user.ID,
+		"user",
+		user.ClientID,
+		[]string{string(user.Role)},
+		nil,
+		now,
+	)
 
 	accessToken, err := s.signer.Sign(claims)
 	if err != nil {
