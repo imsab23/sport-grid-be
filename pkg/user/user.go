@@ -4,20 +4,26 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 
 	db "github.com/imsab23/platform-be/infra/storage/postgres"
-	"github.com/imsab23/platform-be/infra/storage/postgres/helper"
 	helperdb "github.com/imsab23/platform-be/infra/storage/postgres/helper"
+	searchHelper "github.com/imsab23/platform-be/infra/storage/postgres/helper/query"
 	"github.com/imsab23/platform-be/pkg/security/password"
+	"github.com/imsab23/platform-be/pkg/util"
 )
 
 type Service interface {
-	Create(ctx context.Context, user *User) error
+	Search(ctx context.Context, query *SearchUserQuery) (*SearchUserResult, error)
+	Create(ctx context.Context, cmd *CreateUserCommand) (*User, error)
 	GetByID(ctx context.Context, id string) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
-	ValidatePassword(ctx context.Context, password, encryptedPassword string) error
+	// Update(ctx context.Context, cmd *UpdateUserCommand) (*User, error)
+	UpdateLastLogin(ctx context.Context, id uuid.UUID) error
+
+	ValidatePassword(ctx context.Context, rawPassword, hash string) error
 }
 
 type service struct {
@@ -37,45 +43,72 @@ func NewService(db db.DB) (Service, error) {
 	}, nil
 }
 
-func (s *service) Create(ctx context.Context, user *User) error {
-	isExists, err := s.GetByEmail(ctx, user.Email)
+func (s *service) Search(ctx context.Context, query *SearchUserQuery) (*SearchUserResult, error) {
+	params := searchHelper.Params{
+		Columns:     []string{"u.id"},
+		Filters:     query,
+		Search:      &query.Search,
+		Searchable:  []string{"email"},
+		SortBy:      query.Meta.OrderBy,
+		SortDir:     searchHelper.SortDirection(query.Meta.Order),
+		CursorField: "id",
+	}
+
+	result, err := searchHelper.Search[*User](ctx, s.db, searchHelper.From{Table: UserTable}, params)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if isExists != nil {
-		return ErrUserAlreadyExists
-	}
+	m := result.ToMeta(query.Meta.OrderBy, searchHelper.SortDirection(query.Meta.Order))
+	return &SearchUserResult{
+		Users: result.Items,
+		Meta:  &m,
+	}, nil
+}
 
-	user.Password, err = s.hasher.Hash(user.Password)
+func (s *service) Create(ctx context.Context, cmd *CreateUserCommand) (*User, error) {
+	existing, err := s.GetByEmail(ctx, cmd.Email)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	if existing != nil {
+		return nil, ErrUserAlreadyExists
 	}
 
-	err = s.db.InTransaction(ctx, func(ctx context.Context) error {
-		_, err := helperdb.Create(ctx, s.db, UserTable, user)
-		if err != nil {
-			return err
-		}
+	hash, err := s.hasher.Hash(cmd.Password)
+	if err != nil {
+		return nil, err
+	}
 
-		return nil
+	entity := &User{}
+	err = util.MapByJSON(cmd, entity)
+	if err != nil {
+		return nil, err
+	}
+
+	entity.PasswordHash = hash
+
+	_, err = helperdb.Create(ctx, s.db, UserTable, entity, helperdb.CreateOptions{
+		ID: helperdb.IDOptions{
+			Mode:  helperdb.IDApplication,
+			Force: true,
+		},
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return entity, nil
 }
 
 func (s *service) GetByID(ctx context.Context, id string) (*User, error) {
-	user := &User{}
-
 	userID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, ErrUserNotFound
 	}
 
-	err = helper.GetByField(ctx, s.db, UserTable, &User{ID: userID}, user)
+	var u User
+	err = helperdb.GetByField(ctx, s.db, UserTable, &User{ID: userID}, &u)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrUserNotFound
@@ -83,47 +116,36 @@ func (s *service) GetByID(ctx context.Context, id string) (*User, error) {
 		return nil, err
 	}
 
-	return user, nil
+	return &u, nil
 }
 
 func (s *service) GetByEmail(ctx context.Context, email string) (*User, error) {
-	var result User
-	err := helper.GetByField(ctx, s.db, UserTable, &User{Email: email}, &result)
+	var u User
+	err := helperdb.GetByField(ctx, s.db, UserTable, &User{Email: email}, &u)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
-
-	return &result, nil
-}
-
-func (s *service) Update(ctx context.Context, cmd *UpdateUserCommand) error {
-	_, err := s.GetByID(ctx, cmd.ID.String())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return s.db.InTransaction(ctx, func(ctx context.Context) error {
-		err := helper.Update(ctx, s.db, UserTable, cmd.ID, &User{
-			FirstName:     cmd.FirstName,
-			MiddleName:    cmd.MiddleName,
-			LastName:      cmd.LastName,
-			Email:         cmd.Email,
-			ContactNumber: cmd.ContactNumber,
-			UpdatedBy:     cmd.UpdatedBy,
-		})
-		if err != nil {
-			return err
-		}
+	return &u, nil
+}
 
-		return nil
+func (s *service) ValidatePassword(_ context.Context, rawPassword, hash string) error {
+	return s.hasher.Verify(rawPassword, hash)
+}
+
+// userLastLoginUpdate is a targeted struct so UpdateLastLogin only touches the two columns.
+type userLastLoginUpdate struct {
+	LastLoginAt time.Time `db:"last_login_at"`
+	UpdatedAt   time.Time `db:"updated_at"`
+}
+
+func (s *service) UpdateLastLogin(ctx context.Context, id uuid.UUID) error {
+	now := time.Now().UTC()
+	return helperdb.Update(ctx, s.db, UserTable, id, &userLastLoginUpdate{
+		LastLoginAt: now,
+		UpdatedAt:   now,
 	})
-}
-
-func (s *service) Search(ctx context.Context, query *SearchUserQuery) ([]*SearchUserResult, error) {
-
-	return nil, nil
-}
-
-func (s *service) ValidatePassword(ctx context.Context, password, encryptedPassword string) error {
-	return s.hasher.Verify(password, encryptedPassword)
 }

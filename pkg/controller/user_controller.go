@@ -5,39 +5,75 @@ import (
 
 	"github.com/imsab23/platform-be/pkg/http/response"
 	"github.com/imsab23/platform-be/pkg/http/router"
+	"github.com/imsab23/platform-be/pkg/util/meta"
 )
 
 func (s *Server) NewUserController(r router.Router) {
 	r.Group("/users", func(r router.Router) {
-		r.POST("/", s.createUser)
+		r.POST("/", s.createUserHandler)
+		r.GET("/", s.searchUserHandler)
 		r.GET("/{id}", s.getUserHandler)
 	})
+
 }
 
-func (s *Server) createUser(c *router.Ctx) error {
-	var cmd user.User
+func (s *Server) createUserHandler(c *router.Ctx) error {
+	var cmd user.CreateUserCommand
 
-	err := c.Bind(&cmd)
+	err := c.BindJson(&cmd)
 	if err != nil {
 		return err
 	}
 
-	err = s.Dependencies.UserSvc.Create(c.Context(), &cmd)
+	err = cmd.Validate()
 	if err != nil {
 		return err
 	}
 
-	response.Success(c.ResponseWriter(), "User created successfully")
+	_, err = s.Dependencies.UserSvc.Create(c.Context(), &cmd)
+	if err != nil {
+		return err
+	}
+
+	response.SuccessWithMessage(c.ResponseWriter(), "User created successfully")
+	return nil
+}
+
+func (s *Server) searchUserHandler(c *router.Ctx) error {
+	var (
+		query user.SearchUserQuery
+		meta  meta.Meta
+	)
+
+	err := c.BindQuery(&query)
+	if err != nil {
+		return err
+	}
+
+	err = c.BindQuery(&meta)
+	if err != nil {
+		return err
+	}
+
+	query.Meta = &meta
+
+	result, err := s.Dependencies.UserSvc.Search(c.Context(), &query)
+	if err != nil {
+		return err
+	}
+
+	response.SuccessWithMeta(c.ResponseWriter(), result.Users, result.Meta)
 	return nil
 }
 
 func (s *Server) getUserHandler(c *router.Ctx) error {
 	id := c.Param("id")
-	user, err := s.Dependencies.UserSvc.GetByID(c.Context(), id)
+
+	u, err := s.Dependencies.UserSvc.GetByID(c.Context(), id)
 	if err != nil {
 		return err
 	}
 
-	response.SuccessWithResult(c.ResponseWriter(), "", user)
+	response.SuccessWithResult(c.ResponseWriter(), u)
 	return nil
 }
