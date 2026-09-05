@@ -2,9 +2,14 @@ package app
 
 import (
 	"context"
+
+	"sport-grid-be/pkg/auth"
+	"sport-grid-be/pkg/client"
 	"sport-grid-be/pkg/config"
 	"sport-grid-be/pkg/controller"
-	"sport-grid-be/pkg/infra/storage/postgres"
+	"sport-grid-be/pkg/player"
+	"sport-grid-be/pkg/storage/postgres"
+	"sport-grid-be/pkg/user"
 
 	db "github.com/imsab23/platform-be/infra/storage/postgres"
 	logger "github.com/imsab23/platform-be/observability/logging"
@@ -27,12 +32,37 @@ func NewServer(ctx context.Context) (*Server, error) {
 		return nil, err
 	}
 
-	db, err := postgres.InitDB(ctx, cfg)
+	database, err := postgres.InitDB(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	restServer, err := controller.NewServer(&controller.Dependencies{}, cfg)
+	userSvc, err := user.NewService(database)
+	if err != nil {
+		return nil, err
+	}
+
+	playerSvc, err := player.NewService(database)
+	if err != nil {
+		return nil, err
+	}
+
+	authSvc, err := auth.NewService(userSvc, playerSvc, database, &cfg.JWT)
+	if err != nil {
+		return nil, err
+	}
+
+	clientSvc, err := client.NewService(database)
+	if err != nil {
+		return nil, err
+	}
+
+	restServer, err := controller.NewServer(&controller.Dependencies{
+		UserSvc:   userSvc,
+		AuthSvc:   authSvc,
+		PlayerSvc: playerSvc,
+		ClientSvc: clientSvc,
+	}, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +72,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 
 	return &Server{
 		runner: runner,
-		db:     db,
+		db:     database,
 	}, nil
 }
 

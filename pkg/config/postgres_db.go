@@ -14,8 +14,8 @@ type PostgresDB struct {
 func (c *Config) postgresDbConfig() {
 	c.PostgresDB.Host = env.GetOrDefault("POSTGRES_HOST", "localhost")
 	c.PostgresDB.Port = env.GetInt("POSTGRES_PORT", 5432)
-	c.PostgresDB.Database = env.GetOrDefault("POSTGRES_DB", "postgres")
+	c.PostgresDB.Database = env.GetOrDefault("POSTGRES_DB", "sportgridDB")
 	c.PostgresDB.Username = env.GetOrDefault("POSTGRES_USER", "postgres")
-	c.PostgresDB.Password = env.GetOrDefault("POSTGRES_PASSWORD", "password")
+	c.PostgresDB.Password = env.GetOrDefault("POSTGRES_PASSWORD", "secret")
 	c.PostgresDB.SSLMode = env.GetOrDefault("POSTGRES_SSL_MODE", "disable")
 }
