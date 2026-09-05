@@ -2,7 +2,7 @@ package controller
 
 import (
 	"sport-grid-be/pkg/player"
-	"sport-grid-be/pkg/user"
+	"sport-grid-be/pkg/role"
 
 	"github.com/google/uuid"
 	"github.com/imsab23/platform-be/pkg/http/response"
@@ -37,13 +37,13 @@ func (s *Server) getPlayerByID(c *router.Ctx) error {
 		return nil
 	}
 
-	result, err := s.Dependencies.PlayerSvc.GetByPlayerID(c.Context(), idUUID)
+	result, err := s.Dependencies.PlayerSvc.GetByID(c.Context(), idUUID)
 	if err != nil {
 		return err
 	}
 
 	// Super Admin can view any player; others can only view their own profile.
-	if !authz.HasRole(id, user.RoleSuperAdmin) && result.UserID.String() != id.Subject {
+	if !authz.HasRole(id, string(role.SuperAdmin)) && result.ID.String() != id.Subject {
 		response.Forbidden(c.ResponseWriter())
 		return nil
 	}
@@ -59,13 +59,13 @@ func (s *Server) getPlayer(c *router.Ctx) error {
 		return nil
 	}
 
-	userID, err := uuid.Parse(id.Subject)
+	playerID, err := uuid.Parse(id.Subject)
 	if err != nil {
 		response.Forbidden(c.ResponseWriter())
 		return nil
 	}
 
-	result, err := s.Dependencies.PlayerSvc.GetByID(c.Context(), userID)
+	result, err := s.Dependencies.PlayerSvc.GetByID(c.Context(), playerID)
 	if err != nil {
 		return err
 	}
@@ -81,7 +81,7 @@ func (s *Server) updateMeHandler(c *router.Ctx) error {
 		return nil
 	}
 
-	userID, err := uuid.Parse(id.Subject)
+	playerID, err := uuid.Parse(id.Subject)
 	if err != nil {
 		response.Forbidden(c.ResponseWriter())
 		return nil
@@ -93,7 +93,7 @@ func (s *Server) updateMeHandler(c *router.Ctx) error {
 		return err
 	}
 
-	cmd.UserID = userID
+	cmd.ID = playerID
 	prof, err := s.Dependencies.PlayerSvc.Update(c.Context(), &cmd)
 	if err != nil {
 		return err

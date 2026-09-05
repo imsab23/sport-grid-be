@@ -100,3 +100,29 @@ var AlterPlayersDateOfBirth = migration.Migration{
 		)
 	},
 }
+
+// AlterPlayersAddCredentials makes players a standalone, self-authenticating
+// entity — players have no relation to the users table.
+var AlterPlayersAddCredentials = migration.Migration{
+	Version: 6,
+	Name:    "alter_players_add_credentials",
+
+	Up: func(ctx context.Context, exec migration.ExecFunc) error {
+		return exec(ctx, `
+			ALTER TABLE players
+				ADD COLUMN IF NOT EXISTS email TEXT NOT NULL,
+				ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL,
+				ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
+			ALTER TABLE players ADD CONSTRAINT uq_players_email UNIQUE (email);
+		`)
+	},
+
+	Down: func(ctx context.Context, exec migration.ExecFunc) error {
+		return exec(ctx, `
+			ALTER TABLE players
+				DROP COLUMN IF EXISTS email,
+				DROP COLUMN IF EXISTS password_hash,
+				DROP COLUMN IF EXISTS last_login_at;
+		`)
+	},
+}

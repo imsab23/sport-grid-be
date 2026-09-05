@@ -7,7 +7,8 @@ import (
 )
 
 var (
-	ErrInvalidCredentials = apperror.New("AUTH0000", "Invalid credentials.")
+	ErrInvalidCredentials  = apperror.New("AUTH0000", "Invalid credentials.")
+	ErrInvalidRefreshToken = apperror.New("AUTH0001", "Invalid or expired refresh token.")
 )
 
 type UserType string
@@ -36,11 +37,18 @@ type RegisterUserCommand struct {
 type LoginUserCommand struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+	ClientIP string `json:"-"`
+}
+
+type RefreshTokenCommand struct {
+	RefreshToken string `json:"refresh_token"`
+	ClientIP     string `json:"-"`
 }
 
 type LoginUserResult struct {
-	FirstName    string `json:"first_name"`
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresAt    int64  `json:"expires_at"`
+	FirstName        string `json:"first_name"`
+	AccessToken      string `json:"access_token"`
+	RefreshToken     string `json:"refresh_token"`
+	ExpiresAt        int64  `json:"expires_at"`
+	RefreshExpiresAt int64  `json:"refresh_expires_at"`
 }

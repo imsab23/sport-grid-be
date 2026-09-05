@@ -10,15 +10,19 @@ import (
 
 var (
 	ErrPlayerProfileNotFound = apperror.New("PLY0000", "Player profile not found.")
+	ErrPlayerAlreadyExists   = apperror.New("PLY0001", "Player already exists.")
 )
 
 const (
 	PlayerTable = "players"
 )
 
+// Player is a standalone account — it has no relation to the users table.
+// Players authenticate with their own email/password and are never tenant-scoped.
 type Player struct {
 	ID                    uuid.UUID  `db:"id" json:"id"`
-	UserID                uuid.UUID  `db:"user_id" json:"user_id"`
+	Email                 string     `db:"email" json:"email"`
+	PasswordHash          string     `db:"password_hash" json:"-"`
 	FirstName             string     `db:"first_name" json:"first_name"`
 	MiddleName            *string    `db:"middle_name" json:"middle_name"`
 	LastName              string     `db:"last_name" json:"last_name"`
@@ -29,6 +33,7 @@ type Player struct {
 	Address               *string    `db:"address" json:"address,omitempty"`
 	EmergencyContactName  *string    `db:"emergency_contact_name" json:"emergency_contact_name,omitempty"`
 	EmergencyContactPhone *string    `db:"emergency_contact_phone" json:"emergency_contact_phone,omitempty"`
+	LastLoginAt           *time.Time `db:"last_login_at" json:"last_login_at,omitempty"`
 	CreatedAt             time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt             time.Time  `db:"updated_at" json:"updated_at"`
 }
@@ -47,15 +52,16 @@ type PlayerUpdate struct {
 }
 
 type CreatePlayerCommand struct {
-	UserID     uuid.UUID `json:"-"`
-	FirstName  string    `json:"first_name"`
-	MiddleName *string   `json:"middle_name"`
-	LastName   string    `json:"last_name"`
-	Phone      *string   `json:"phone"`
+	Email      string  `json:"email"`
+	Password   string  `json:"password"`
+	FirstName  string  `json:"first_name"`
+	MiddleName *string `json:"middle_name"`
+	LastName   string  `json:"last_name"`
+	Phone      *string `json:"phone"`
 }
 
 type UpdatePlayerCommand struct {
-	UserID                uuid.UUID  `json:"-"`
+	ID                    uuid.UUID  `json:"-"`
 	FirstName             string     `json:"first_name"`
 	MiddleName            *string    `json:"middle_name"`
 	LastName              string     `json:"last_name"`
@@ -67,10 +73,9 @@ type UpdatePlayerCommand struct {
 	EmergencyContactPhone *string    `json:"emergency_contact_phone"`
 }
 
-// PlayerSearchItem is the result row for a player search (players JOIN users).
+// PlayerSearchItem is the result row for a player search.
 type PlayerSearchItem struct {
 	ID         uuid.UUID `db:"id"          json:"id"`
-	UserID     uuid.UUID `db:"user_id"     json:"user_id"`
 	FirstName  string    `db:"first_name"  json:"first_name"`
 	MiddleName *string   `db:"middle_name" json:"middle_name"`
 	LastName   string    `db:"last_name"   json:"last_name"`

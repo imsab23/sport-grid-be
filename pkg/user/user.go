@@ -87,6 +87,7 @@ func (s *service) Create(ctx context.Context, cmd *CreateUserCommand) (*User, er
 	}
 
 	entity.PasswordHash = hash
+	entity.Status = Active
 
 	_, err = helperdb.Create(ctx, s.db, UserTable, entity, helperdb.CreateOptions{
 		ID: helperdb.IDOptions{

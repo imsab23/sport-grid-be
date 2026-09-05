@@ -14,7 +14,6 @@ func (s *Server) NewUserController(r router.Router) {
 		r.GET("/", s.searchUserHandler)
 		r.GET("/{id}", s.getUserHandler)
 	})
-
 }
 
 func (s *Server) createUserHandler(c *router.Ctx) error {

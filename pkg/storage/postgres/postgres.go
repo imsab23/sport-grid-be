@@ -41,6 +41,9 @@ func Migration(ctx context.Context, db db.DB) error {
 		mig.UserPasswordResetToken,
 		mig.AlterPlayersDateOfBirth,
 		mig.AlterUsersAddRoleClientID,
+		mig.ClientsMigration,
+		mig.AlterUsersClientIDFK,
+		mig.AlterPlayersAddCredentials,
 	})
 	if err != nil {
 		return err

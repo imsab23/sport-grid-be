@@ -12,37 +12,60 @@ import (
 	db "github.com/imsab23/platform-be/infra/storage/postgres"
 	helperdb "github.com/imsab23/platform-be/infra/storage/postgres/helper"
 	searchHelper "github.com/imsab23/platform-be/infra/storage/postgres/helper/query"
+	"github.com/imsab23/platform-be/pkg/security/password"
 )
 
 type Service interface {
 	Search(ctx context.Context, query *SearchPlayerQuery) (*SearchPlayerResult, error)
 	Create(ctx context.Context, cmd *CreatePlayerCommand) (*Player, error)
-	GetByID(ctx context.Context, userID uuid.UUID) (*Player, error)
-	GetByPlayerID(ctx context.Context, id uuid.UUID) (*Player, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*Player, error)
+	GetByEmail(ctx context.Context, email string) (*Player, error)
 	Update(ctx context.Context, cmd *UpdatePlayerCommand) (*Player, error)
+	ValidatePassword(ctx context.Context, rawPassword, hash string) error
+	UpdateLastLogin(ctx context.Context, id uuid.UUID) error
 }
 
 type service struct {
-	db db.DB
+	db     db.DB
+	hasher *password.Hasher
 }
 
 func NewService(db db.DB) (Service, error) {
-	return &service{db: db}, nil
+	hasher, err := password.NewHasher(password.DefaultConfig())
+	if err != nil {
+		return nil, err
+	}
+
+	return &service{db: db, hasher: hasher}, nil
 }
 
 func (s *service) Create(ctx context.Context, cmd *CreatePlayerCommand) (*Player, error) {
-	now := time.Now().UTC()
-	profile := &Player{
-		UserID:     cmd.UserID,
-		FirstName:  cmd.FirstName,
-		MiddleName: cmd.MiddleName,
-		LastName:   cmd.LastName,
-		Phone:      cmd.Phone,
-		CreatedAt:  now,
-		UpdatedAt:  now,
+	existing, err := s.GetByEmail(ctx, cmd.Email)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return nil, ErrPlayerAlreadyExists
 	}
 
-	_, err := helperdb.Create(ctx, s.db, PlayerTable, profile, helperdb.CreateOptions{
+	hash, err := s.hasher.Hash(cmd.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	profile := &Player{
+		Email:        cmd.Email,
+		PasswordHash: hash,
+		FirstName:    cmd.FirstName,
+		MiddleName:   cmd.MiddleName,
+		LastName:     cmd.LastName,
+		Phone:        cmd.Phone,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+
+	_, err = helperdb.Create(ctx, s.db, PlayerTable, profile, helperdb.CreateOptions{
 		ID: helperdb.IDOptions{
 			Mode:  helperdb.IDApplication,
 			Force: true,
@@ -55,20 +78,7 @@ func (s *service) Create(ctx context.Context, cmd *CreatePlayerCommand) (*Player
 	return profile, nil
 }
 
-func (s *service) GetByID(ctx context.Context, userID uuid.UUID) (*Player, error) {
-	var profile Player
-	err := helperdb.GetByField(ctx, s.db, PlayerTable, &Player{UserID: userID}, &profile)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrPlayerProfileNotFound
-		}
-		return nil, err
-	}
-
-	return &profile, nil
-}
-
-func (s *service) GetByPlayerID(ctx context.Context, id uuid.UUID) (*Player, error) {
+func (s *service) GetByID(ctx context.Context, id uuid.UUID) (*Player, error) {
 	var profile Player
 	err := helperdb.GetByField(ctx, s.db, PlayerTable, &Player{ID: id}, &profile)
 	if err != nil {
@@ -81,8 +91,39 @@ func (s *service) GetByPlayerID(ctx context.Context, id uuid.UUID) (*Player, err
 	return &profile, nil
 }
 
+func (s *service) GetByEmail(ctx context.Context, email string) (*Player, error) {
+	var profile Player
+	err := helperdb.GetByField(ctx, s.db, PlayerTable, &Player{Email: email}, &profile)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &profile, nil
+}
+
+func (s *service) ValidatePassword(_ context.Context, rawPassword, hash string) error {
+	return s.hasher.Verify(rawPassword, hash)
+}
+
+// playerLastLoginUpdate is a targeted struct so UpdateLastLogin only touches the two columns.
+type playerLastLoginUpdate struct {
+	LastLoginAt time.Time `db:"last_login_at"`
+	UpdatedAt   time.Time `db:"updated_at"`
+}
+
+func (s *service) UpdateLastLogin(ctx context.Context, id uuid.UUID) error {
+	now := time.Now().UTC()
+	return helperdb.Update(ctx, s.db, PlayerTable, id, &playerLastLoginUpdate{
+		LastLoginAt: now,
+		UpdatedAt:   now,
+	})
+}
+
 func (s *service) Update(ctx context.Context, cmd *UpdatePlayerCommand) (*Player, error) {
-	profile, err := s.GetByID(ctx, cmd.UserID)
+	profile, err := s.GetByID(ctx, cmd.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -120,9 +161,6 @@ func (s *service) Update(ctx context.Context, cmd *UpdatePlayerCommand) (*Player
 	return profile, nil
 }
 
-// playerJoinTable is the FROM expression that resolves player fields alongside user email.
-const playerJoinTable = "players INNER JOIN users ON players.user_id = users.id"
-
 func (s *service) Search(ctx context.Context, query *SearchPlayerQuery) (*SearchPlayerResult, error) {
 	sortDir := searchHelper.SortAsc
 	if strings.EqualFold(query.Meta.Order, "desc") {
@@ -131,23 +169,22 @@ func (s *service) Search(ctx context.Context, query *SearchPlayerQuery) (*Search
 
 	params := searchHelper.Params{
 		Columns: []string{
-			"players.id AS id",
-			"players.user_id AS user_id",
-			"players.first_name AS first_name",
-			"players.middle_name AS middle_name",
-			"players.last_name AS last_name",
-			"players.phone AS phone",
-			"players.created_at AS created_at",
-			"users.email AS email",
+			"id",
+			"first_name",
+			"middle_name",
+			"last_name",
+			"phone",
+			"email",
+			"created_at",
 		},
 		Search:      query.Search,
-		Searchable:  []string{"players.first_name", "players.last_name", "users.email"},
+		Searchable:  []string{"first_name", "last_name", "email"},
 		SortBy:      query.Meta.OrderBy,
 		SortDir:     sortDir,
-		CursorField: "players.id",
+		CursorField: "id",
 	}
 
-	result, err := searchHelper.Search[*PlayerSearchItem](ctx, s.db, searchHelper.From{Table: playerJoinTable}, params)
+	result, err := searchHelper.Search[*PlayerSearchItem](ctx, s.db, searchHelper.From{Table: PlayerTable}, params)
 	if err != nil {
 		return nil, err
 	}

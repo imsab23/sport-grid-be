@@ -26,14 +26,6 @@ const (
 	UserTable = "users"
 )
 
-// Role constants — values stored in users.role and carried in JWT claims.
-const (
-	RoleSuperAdmin      = "SUPER_ADMIN"
-	RoleClientAdmin     = "CLIENT_ADMIN"
-	RoleTournamentStaff = "TOURNAMENT_STAFF"
-	RolePlayer          = "PLAYER"
-)
-
 type Status int
 
 const (
@@ -60,10 +52,12 @@ type User struct {
 }
 
 type SearchUserQuery struct {
-	Search string  `query:"search"`
-	Email  *string `db:"email" query:"email" empty:"skip"`
-	Status *Status `db:"status" query:"status" empty:"skip"`
-	Meta   *meta.Meta
+	Search   string     `query:"search"`
+	Email    *string    `db:"email" query:"email" empty:"skip"`
+	Status   *Status    `db:"status" query:"status" empty:"skip"`
+	ClientID *uuid.UUID `db:"client_id" query:"client_id" empty:"skip"`
+	Role     *role.Role `db:"role" query:"role" empty:"skip"`
+	Meta     *meta.Meta
 }
 
 type SearchUserResult struct {

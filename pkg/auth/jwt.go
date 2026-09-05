@@ -1,11 +1,8 @@
 package auth
 
 import (
-	"crypto/ed25519"
-	"crypto/x509"
-	"encoding/pem"
+	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"sport-grid-be/pkg/config"
@@ -13,64 +10,25 @@ import (
 	"github.com/imsab23/platform-be/pkg/security/jwt"
 )
 
-func loadEdDSAKeyPair(
-	kid string,
-	privateKeyPath string,
-	publicKeyPath string,
-) (jwt.KeyPair, error) {
-	// Load private key.
-	privatePEM, err := os.ReadFile(privateKeyPath)
-	if err != nil {
-		return jwt.KeyPair{}, fmt.Errorf("jwt: read private key: %w", err)
-	}
-
-	privateBlock, _ := pem.Decode(privatePEM)
-	if privateBlock == nil {
-		return jwt.KeyPair{}, fmt.Errorf("jwt: decode private key PEM")
-	}
-
-	privateKey, err := x509.ParsePKCS8PrivateKey(privateBlock.Bytes)
-	if err != nil {
-		return jwt.KeyPair{}, fmt.Errorf("jwt: parse private key: %w", err)
-	}
-
-	edPrivateKey, ok := privateKey.(ed25519.PrivateKey)
-	if !ok {
-		return jwt.KeyPair{}, fmt.Errorf("jwt: private key is not Ed25519")
-	}
-
-	// Load public key.
-	publicPEM, err := os.ReadFile(publicKeyPath)
-	if err != nil {
-		return jwt.KeyPair{}, fmt.Errorf("jwt: read public key: %w", err)
-	}
-
-	publicBlock, _ := pem.Decode(publicPEM)
-	if publicBlock == nil {
-		return jwt.KeyPair{}, fmt.Errorf("jwt: decode public key PEM")
-	}
-
-	publicKey, err := x509.ParsePKIXPublicKey(publicBlock.Bytes)
-	if err != nil {
-		return jwt.KeyPair{}, fmt.Errorf("jwt: parse public key: %w", err)
-	}
-
-	edPublicKey, ok := publicKey.(ed25519.PublicKey)
-	if !ok {
-		return jwt.KeyPair{}, fmt.Errorf("jwt: public key is not Ed25519")
-	}
-
-	return jwt.KeyPair{
-		ID:         kid,
-		PrivateKey: edPrivateKey,
-		PublicKey:  edPublicKey,
-	}, nil
-}
-
 func Init(cfg *config.JWTConfig) (jwtCfg jwt.Config, signer *jwt.Signer, verifier *jwt.Verifier, err error) {
-	jwtCfg = jwt.DefaultConfig(cfg.Issuer, cfg.Audience)
+	if cfg == nil {
+		return jwt.Config{}, nil, nil, fmt.Errorf("JWT config must not be nil")
+	}
 
-	kp, err := loadEdDSAKeyPair(cfg.KID, cfg.PrivateKeyPath, cfg.PublicKeyPath)
+	jwtCfg = jwt.DefaultConfig(cfg.Issuer, cfg.Audience)
+	jwtCfg.AccessTokenTTL = cfg.AccessTokenTTL
+	jwtCfg.RefreshTokenTTL = cfg.RefreshTokenTTL
+
+	loader, err := jwt.NewFileKeyLoader(jwt.KeyConfig{
+		KID:            cfg.KID,
+		PrivateKeyPath: cfg.PrivateKeyPath,
+		PublicKeyPath:  cfg.PublicKeyPath,
+	})
+	if err != nil {
+		return jwtCfg, nil, nil, fmt.Errorf("create JWT key loader: %w", err)
+	}
+
+	kp, err := loader.Load(context.Background())
 	if err != nil {
 		return jwtCfg, nil, nil, fmt.Errorf("load JWT key pair: %w", err)
 	}
@@ -93,25 +51,36 @@ func Init(cfg *config.JWTConfig) (jwtCfg jwt.Config, signer *jwt.Signer, verifie
 	return jwtCfg, signer, verifier, nil
 }
 
-func (s *service) GenerateToken(user *UserAuth) (string, error) {
+func (s *service) generateAccessToken(user *UserAuth, clientIP string) (string, jwt.Claims, error) {
 	now := time.Now().UTC()
-	claims := jwt.NewAccessClaims(
-		s.jwtCfg,
-		user.ID,
-		user.ID,
-		"user",
-		user.ClientID,
-		[]string{string(user.Role)},
-		nil,
-		now,
-	)
+
+	var roles []string
+	if user.Role != "" {
+		roles = []string{string(user.Role)}
+	}
+
+	claims := jwt.NewAccessClaims(jwt.AccessClaimsParams{
+		Config:   s.jwtCfg,
+		Subject:  user.ID,
+		UserID:   user.ID,
+		UserType: string(user.UserType),
+		ClientID: user.ClientID,
+		ClientIP: clientIP,
+		Roles:    roles,
+		Now:      now,
+	})
 
 	accessToken, err := s.signer.Sign(claims)
 	if err != nil {
-		return "", fmt.Errorf("sign access token: %w", err)
+		return "", jwt.Claims{}, fmt.Errorf("sign access token: %w", err)
 	}
 
-	return accessToken, nil
+	return accessToken, claims, nil
+}
+
+func (s *service) GenerateToken(user *UserAuth) (string, error) {
+	accessToken, _, err := s.generateAccessToken(user, "")
+	return accessToken, err
 }
 
 func (s *service) VerifyToken() *jwt.Verifier {

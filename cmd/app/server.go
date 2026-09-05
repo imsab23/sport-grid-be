@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+
 	"sport-grid-be/pkg/auth"
+	"sport-grid-be/pkg/client"
 	"sport-grid-be/pkg/config"
 	"sport-grid-be/pkg/controller"
 	"sport-grid-be/pkg/player"
@@ -50,10 +52,16 @@ func NewServer(ctx context.Context) (*Server, error) {
 		return nil, err
 	}
 
+	clientSvc, err := client.NewService(database)
+	if err != nil {
+		return nil, err
+	}
+
 	restServer, err := controller.NewServer(&controller.Dependencies{
 		UserSvc:   userSvc,
 		AuthSvc:   authSvc,
 		PlayerSvc: playerSvc,
+		ClientSvc: clientSvc,
 	}, cfg)
 	if err != nil {
 		return nil, err

@@ -3,18 +3,20 @@ package controller
 import (
 	"context"
 	"sport-grid-be/pkg/auth"
+	"sport-grid-be/pkg/client"
 	"sport-grid-be/pkg/config"
 
 	"sport-grid-be/pkg/player"
+	"sport-grid-be/pkg/role"
 	"sport-grid-be/pkg/user"
 
 	logger "github.com/imsab23/platform-be/observability/logging"
+	"github.com/imsab23/platform-be/pkg/http/clientip"
 	"github.com/imsab23/platform-be/pkg/http/response"
 	"github.com/imsab23/platform-be/pkg/http/router"
 	chirtr "github.com/imsab23/platform-be/pkg/http/router/chi"
 	"github.com/imsab23/platform-be/pkg/http/server"
 	authmw "github.com/imsab23/platform-be/pkg/middleware/auth"
-
 	authzmw "github.com/imsab23/platform-be/pkg/middleware/authz"
 )
 
@@ -29,6 +31,7 @@ type Dependencies struct {
 	UserSvc   user.Service
 	AuthSvc   auth.Service
 	PlayerSvc player.Service
+	ClientSvc client.Service
 }
 
 func NewServer(deps *Dependencies, cfg *config.Config) (*Server, error) {
@@ -64,14 +67,22 @@ func (s *Server) registerRoutes() {
 				wrapNetHTTPMiddleware(
 					authmw.New(
 						s.Dependencies.AuthSvc.VerifyToken(),
+						authmw.WithClientIPFunc(clientip.FromXForwardedFor),
 					),
 				),
 			)
 
-			// Super Admin only — user management.
+			// Super Admin only — user and client management.
 			protected.Group("", func(superAdmin router.Router) {
-				superAdmin.Use(wrapNetHTTPMiddleware(authzmw.RequireRole(user.RoleSuperAdmin)))
+				superAdmin.Use(wrapNetHTTPMiddleware(authzmw.RequireRole(string(role.SuperAdmin))))
 				s.NewUserController(superAdmin)
+				s.NewClientController(superAdmin)
+			})
+
+			// Client Admin only — tournament staff management.
+			protected.Group("", func(clientAdmin router.Router) {
+				clientAdmin.Use(wrapNetHTTPMiddleware(authzmw.RequireRole(string(role.ClientAdmin))))
+				s.NewStaffController(clientAdmin)
 			})
 
 			s.NewPlayerController(protected)
