@@ -18,10 +18,10 @@ import (
 type Service interface {
 	Search(ctx context.Context, query *SearchUserQuery) (*SearchUserResult, error)
 	Create(ctx context.Context, cmd *CreateUserCommand) (*User, error)
-	GetByID(ctx context.Context, id string) (*User, error)
+	GetByID(ctx context.Context, id uuid.UUID) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
-	// Update(ctx context.Context, cmd *UpdateUserCommand) (*User, error)
 	UpdateLastLogin(ctx context.Context, id uuid.UUID) error
+	UpdatePassword(ctx context.Context, cmd *UpdateUserPasswordCommand) error
 
 	ValidatePassword(ctx context.Context, rawPassword, hash string) error
 }
@@ -102,14 +102,9 @@ func (s *service) Create(ctx context.Context, cmd *CreateUserCommand) (*User, er
 	return entity, nil
 }
 
-func (s *service) GetByID(ctx context.Context, id string) (*User, error) {
-	userID, err := uuid.Parse(id)
-	if err != nil {
-		return nil, ErrUserNotFound
-	}
-
-	var u User
-	err = helperdb.GetByField(ctx, s.db, UserTable, &User{ID: userID}, &u)
+func (s *service) GetByID(ctx context.Context, id uuid.UUID) (*User, error) {
+	var result User
+	err := helperdb.GetByField(ctx, s.db, UserTable, &User{ID: id}, &result)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrUserNotFound
@@ -117,7 +112,7 @@ func (s *service) GetByID(ctx context.Context, id string) (*User, error) {
 		return nil, err
 	}
 
-	return &u, nil
+	return &result, nil
 }
 
 func (s *service) GetByEmail(ctx context.Context, email string) (*User, error) {
@@ -137,16 +132,31 @@ func (s *service) ValidatePassword(_ context.Context, rawPassword, hash string) 
 	return s.hasher.Verify(rawPassword, hash)
 }
 
-// userLastLoginUpdate is a targeted struct so UpdateLastLogin only touches the two columns.
-type userLastLoginUpdate struct {
-	LastLoginAt time.Time `db:"last_login_at"`
-	UpdatedAt   time.Time `db:"updated_at"`
-}
-
 func (s *service) UpdateLastLogin(ctx context.Context, id uuid.UUID) error {
 	now := time.Now().UTC()
-	return helperdb.Update(ctx, s.db, UserTable, id, &userLastLoginUpdate{
+	return helperdb.Update(ctx, s.db, UserTable, id, &UserLastLoginUpdate{
 		LastLoginAt: now,
 		UpdatedAt:   now,
 	})
+}
+
+func (s *service) UpdatePassword(ctx context.Context, cmd *UpdateUserPasswordCommand) error {
+	usr, err := s.GetByID(ctx, cmd.ID)
+	if err != nil {
+		return err
+	}
+
+	err = s.hasher.Verify(cmd.OldPassword, usr.PasswordHash)
+	if err != nil {
+		return err
+	}
+
+	hash, err := s.hasher.Hash(cmd.NewPassword)
+	if err != nil {
+		return err
+	}
+
+	cmd.PasswordHash = hash
+
+	return helperdb.Update(ctx, s.db, UserTable, cmd.ID, cmd)
 }

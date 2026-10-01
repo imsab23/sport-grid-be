@@ -34,7 +34,7 @@ func (s *service) Create(ctx context.Context, cmd *CreateClientCommand) (*Client
 	now := time.Now().UTC()
 	c := &Client{
 		Name:         cmd.Name,
-		Slug:         strings.ToLower(cmd.Slug),
+		Slug:         strings.ToLower(generateSlug(cmd.Name)),
 		Status:       StatusActive,
 		ContactName:  cmd.ContactName,
 		ContactEmail: cmd.ContactEmail,

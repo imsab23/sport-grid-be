@@ -6,8 +6,16 @@ import (
 	"sport-grid-be/pkg/client"
 	"sport-grid-be/pkg/config"
 
+	"sport-grid-be/pkg/bracket"
+	"sport-grid-be/pkg/court"
+	"sport-grid-be/pkg/division"
+	"sport-grid-be/pkg/match"
 	"sport-grid-be/pkg/player"
-	"sport-grid-be/pkg/role"
+	"sport-grid-be/pkg/registration"
+	"sport-grid-be/pkg/seeding"
+	"sport-grid-be/pkg/sport"
+	"sport-grid-be/pkg/team"
+	"sport-grid-be/pkg/tournament"
 	"sport-grid-be/pkg/user"
 
 	logger "github.com/imsab23/platform-be/observability/logging"
@@ -28,10 +36,19 @@ type Server struct {
 }
 
 type Dependencies struct {
-	UserSvc   user.Service
-	AuthSvc   auth.Service
-	PlayerSvc player.Service
-	ClientSvc client.Service
+	UserSvc         user.Service
+	AuthSvc         auth.Service
+	PlayerSvc       player.Service
+	ClientSvc       client.Service
+	SportSvc        sport.Service
+	TournamentSvc   tournament.Service
+	DivisionSvc     division.Service
+	RegistrationSvc registration.Service
+	TeamSvc         team.Service
+	CourtSvc        court.Service
+	SeedingSvc      seeding.Service
+	BracketSvc      bracket.Service
+	MatchSvc        match.Service
 }
 
 func NewServer(deps *Dependencies, cfg *config.Config) (*Server, error) {
@@ -72,20 +89,28 @@ func (s *Server) registerRoutes() {
 				),
 			)
 
-			// Super Admin only — user and client management.
-			protected.Group("", func(superAdmin router.Router) {
-				superAdmin.Use(wrapNetHTTPMiddleware(authzmw.RequireRole(string(role.SuperAdmin))))
-				s.NewUserController(superAdmin)
-				s.NewClientController(superAdmin)
+			protected.Group("", func(reqUser router.Router) {
+				reqUser.Use(wrapNetHTTPMiddleware(authzmw.RequireUserType(string(auth.User))))
+				s.NewUserController(reqUser)
+				s.NewClientController(reqUser)
+				s.NewSportController(reqUser)
+				s.NewTournamentController(reqUser)
+				s.NewDivisionController(reqUser)
+				s.NewRegistrationController(reqUser)
+				s.NewTeamController(reqUser)
+				s.NewCourtController(reqUser)
+				s.NewSeedingController(reqUser)
+				s.NewBracketController(reqUser)
+				s.NewMatchController(reqUser)
 			})
 
-			// Client Admin only — tournament staff management.
-			protected.Group("", func(clientAdmin router.Router) {
-				clientAdmin.Use(wrapNetHTTPMiddleware(authzmw.RequireRole(string(role.ClientAdmin))))
-				s.NewStaffController(clientAdmin)
+			protected.Group("", func(reqPlayer router.Router) {
+				reqPlayer.Use(wrapNetHTTPMiddleware(authzmw.RequireUserType(string(auth.Player))))
+				s.NewPlayerController(reqPlayer)
+				s.NewPlayerRegistrationController(reqPlayer)
+				s.NewPlayerTeamController(reqPlayer)
 			})
 
-			s.NewPlayerController(protected)
 		})
 	})
 }

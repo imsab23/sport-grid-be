@@ -20,6 +20,8 @@ var (
 	ErrRoleRequired         = apperror.New("USR0006", "Role is required.")
 	ErrClientIDRequired     = apperror.New("USR0007", "Client is required.")
 	ErrInvalidContactNumber = apperror.New("USR0008", "Invalid contact number format.")
+	ErrOldPasswordRequired  = apperror.New("USR0009", "Old password is required.")
+	ErrNewPasswordRequired  = apperror.New("USR0010", "New password is required.")
 )
 
 const (
@@ -130,6 +132,31 @@ func (c *UpdateUserCommand) Validate() error {
 
 	if c.ContactNumber != nil && !validate.Phone(*c.ContactNumber) {
 		return ErrInvalidContactNumber
+	}
+
+	return nil
+}
+
+type UserLastLoginUpdate struct {
+	LastLoginAt time.Time `db:"last_login_at"`
+	UpdatedAt   time.Time `db:"updated_at"`
+}
+
+type UpdateUserPasswordCommand struct {
+	ID           uuid.UUID `json:"id"`
+	OldPassword  string    `json:"old_password"`
+	NewPassword  string    `json:"new_password"`
+	PasswordHash string    `db:"password_hash"`
+	UpdatedAt    time.Time `db:"updated_at"`
+}
+
+func (c *UpdateUserPasswordCommand) Validate() error {
+	if !validate.RequiredString(c.OldPassword) {
+		return ErrOldPasswordRequired
+	}
+
+	if !validate.RequiredString(c.NewPassword) {
+		return ErrNewPasswordRequired
 	}
 
 	return nil

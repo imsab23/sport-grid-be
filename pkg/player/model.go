@@ -36,19 +36,7 @@ type Player struct {
 	LastLoginAt           *time.Time `db:"last_login_at" json:"last_login_at,omitempty"`
 	CreatedAt             time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt             time.Time  `db:"updated_at" json:"updated_at"`
-}
-
-type PlayerUpdate struct {
-	FirstName             string     `db:"first_name"`
-	MiddleName            *string    `db:"middle_name"`
-	LastName              string     `db:"last_name"`
-	DateOfBirth           *time.Time `db:"date_of_birth"`
-	Gender                *string    `db:"gender"`
-	Phone                 *string    `db:"phone"`
-	Address               *string    `db:"address"`
-	EmergencyContactName  *string    `db:"emergency_contact_name"`
-	EmergencyContactPhone *string    `db:"emergency_contact_phone"`
-	UpdatedAt             time.Time  `db:"updated_at"`
+	UpdateBy              *string    `db:"updated_by" json:"updated_by"`
 }
 
 type CreatePlayerCommand struct {
@@ -61,16 +49,18 @@ type CreatePlayerCommand struct {
 }
 
 type UpdatePlayerCommand struct {
-	ID                    uuid.UUID  `json:"-"`
-	FirstName             string     `json:"first_name"`
-	MiddleName            *string    `json:"middle_name"`
-	LastName              string     `json:"last_name"`
-	DateOfBirth           *time.Time `json:"date_of_birth"`
-	Gender                *string    `json:"gender"`
-	Phone                 *string    `json:"phone"`
-	Address               *string    `json:"address"`
-	EmergencyContactName  *string    `json:"emergency_contact_name"`
-	EmergencyContactPhone *string    `json:"emergency_contact_phone"`
+	ID                    uuid.UUID
+	FirstName             string     `db:"first_name" json:"first_name"`
+	MiddleName            *string    `db:"middle_name" json:"middle_name"`
+	LastName              string     `db:"last_name" json:"last_name"`
+	DateOfBirth           *time.Time `db:"date_of_birth" json:"date_of_birth"`
+	Gender                *string    `db:"gender" json:"gender"`
+	Phone                 *string    `db:"phone" json:"phone"`
+	Address               *string    `db:"address" json:"address"`
+	EmergencyContactName  *string    `db:"emergency_contact_name" json:"emergency_contact_name"`
+	EmergencyContactPhone *string    `db:"emergency_contact_phone" json:"emergency_contact_phone"`
+	UpdatedAt             time.Time  `db:"updated_at" json:"updated_at"`
+	UpdateBy              string     `db:"updated_by" json:"updated_by"`
 }
 
 // PlayerSearchItem is the result row for a player search.

@@ -44,6 +44,16 @@ func Migration(ctx context.Context, db db.DB) error {
 		mig.ClientsMigration,
 		mig.AlterUsersClientIDFK,
 		mig.AlterPlayersAddCredentials,
+		mig.SportMigration,
+		mig.TournamentMigration,
+		mig.TournamentDivisionMigration,
+		mig.RegistrationMigration,
+		mig.PaymentSubmissionMigration,
+		mig.TeamMigration,
+		mig.CourtMigration,
+		mig.SeedingMigration,
+		mig.BracketMigration,
+		mig.MatchMigration,
 	})
 	if err != nil {
 		return err

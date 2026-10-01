@@ -3,6 +3,7 @@ package controller
 import (
 	"sport-grid-be/pkg/player"
 	"sport-grid-be/pkg/role"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/imsab23/platform-be/pkg/http/response"
@@ -77,7 +78,6 @@ func (s *Server) getPlayer(c *router.Ctx) error {
 func (s *Server) updateMeHandler(c *router.Ctx) error {
 	id := identity.FromContext(c.Context())
 	if id == nil {
-		response.Forbidden(c.ResponseWriter())
 		return nil
 	}
 
@@ -94,6 +94,8 @@ func (s *Server) updateMeHandler(c *router.Ctx) error {
 	}
 
 	cmd.ID = playerID
+	cmd.UpdatedAt = time.Now().UTC()
+	cmd.UpdateBy = id.Subject
 	prof, err := s.Dependencies.PlayerSvc.Update(c.Context(), &cmd)
 	if err != nil {
 		return err

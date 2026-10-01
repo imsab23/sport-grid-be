@@ -34,8 +34,8 @@ func (f *fakeUserService) Create(context.Context, *user.CreateUserCommand) (*use
 	return nil, nil
 }
 
-func (f *fakeUserService) GetByID(_ context.Context, id string) (*user.User, error) {
-	return f.byID[id], nil
+func (f *fakeUserService) GetByID(_ context.Context, id uuid.UUID) (*user.User, error) {
+	return f.byID[id.String()], nil
 }
 
 func (f *fakeUserService) GetByEmail(_ context.Context, email string) (*user.User, error) {
@@ -50,6 +50,10 @@ func (f *fakeUserService) ValidatePassword(_ context.Context, rawPassword, hash 
 	if rawPassword != hash {
 		return errors.New("invalid password")
 	}
+	return nil
+}
+
+func (f *fakeUserService) UpdatePassword(_ context.Context, cmd *user.UpdateUserPasswordCommand) error {
 	return nil
 }
 

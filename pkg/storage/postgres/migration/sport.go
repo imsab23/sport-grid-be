@@ -8,7 +8,8 @@ import (
 )
 
 var SportMigration = migration.Migration{
-	Version: 6,
+	// Version 17: 6 collides with the already-wired AlterPlayersAddCredentials.
+	Version: 17,
 	Name:    "create_sports_table",
 
 	Up: func(ctx context.Context, exec migration.ExecFunc) error {

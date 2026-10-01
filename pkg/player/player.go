@@ -128,21 +128,7 @@ func (s *service) Update(ctx context.Context, cmd *UpdatePlayerCommand) (*Player
 		return nil, err
 	}
 
-	now := time.Now().UTC()
-	updateData := &PlayerUpdate{
-		FirstName:             cmd.FirstName,
-		MiddleName:            cmd.MiddleName,
-		LastName:              cmd.LastName,
-		DateOfBirth:           cmd.DateOfBirth,
-		Gender:                cmd.Gender,
-		Phone:                 cmd.Phone,
-		Address:               cmd.Address,
-		EmergencyContactName:  cmd.EmergencyContactName,
-		EmergencyContactPhone: cmd.EmergencyContactPhone,
-		UpdatedAt:             now,
-	}
-
-	err = helperdb.Update(ctx, s.db, PlayerTable, profile.ID, updateData)
+	err = helperdb.Update(ctx, s.db, PlayerTable, profile.ID, cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +142,8 @@ func (s *service) Update(ctx context.Context, cmd *UpdatePlayerCommand) (*Player
 	profile.Address = cmd.Address
 	profile.EmergencyContactName = cmd.EmergencyContactName
 	profile.EmergencyContactPhone = cmd.EmergencyContactPhone
-	profile.UpdatedAt = now
+	profile.UpdatedAt = cmd.UpdatedAt
+	profile.UpdateBy = &cmd.UpdateBy
 
 	return profile, nil
 }

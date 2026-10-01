@@ -219,7 +219,7 @@ func (s *service) RefreshToken(ctx context.Context, cmd *RefreshTokenCommand) (*
 func (s *service) loadUserAuth(ctx context.Context, data refreshSessionData) (*UserAuth, string, error) {
 	switch data.UserType {
 	case User:
-		u, err := s.userSvc.GetByID(ctx, data.UserID)
+		u, err := s.userSvc.GetByID(ctx, uuid.MustParse(data.UserID))
 		if err != nil || u == nil {
 			return nil, "", ErrInvalidRefreshToken
 		}
