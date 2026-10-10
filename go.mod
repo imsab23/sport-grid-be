@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/imsab23/platform-be v0.0.0-20260906044813-bc4067efa298
+	github.com/imsab23/platform-be v0.0.0-20261010132655-4a2d4653e3d8
 	github.com/joho/godotenv v1.5.1
 )
 

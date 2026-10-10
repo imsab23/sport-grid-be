@@ -1,0 +1,120 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - noinlineerr
+    - varnamelen
+    - errcheck
+    - errorlint
+    - errname
+    - wrapcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - revive
+    - gocritic
+    - gosec
+    - bodyclose
+    - noctx
+    - sqlclosecheck
+    - rowserrcheck
+    - contextcheck
+    - nilerr
+    - nilnil
+    - nolintlint
+    - misspell
+    - unparam
+    - usestdlibvars
+    - forcetypeassert
+    - exhaustive
+    - gochecknoglobals
+    - gochecknoinits
+    - gocognit
+    - nestif
+    - funlen
+    - thelper
+    - tparallel
+    - copyloopvar
+    - durationcheck
+  settings:
+    varnamelen:
+      min-name-length: 3
+      max-distance: 1
+      ignore-names:
+        - id
+        - ok
+        - db
+        - i
+        - j
+      ignore-type-assert-ok: true
+      ignore-map-index-ok: true
+      ignore-chan-recv-ok: true
+      ignore-decls:
+        - t *testing.T
+        - b *testing.B
+        - f *testing.F
+        - m *testing.M
+        - tb testing.TB
+        - T any
+        - K comparable
+        - V any
+    errcheck:
+      check-type-assertions: true
+    govet:
+      enable:
+        - shadow
+    revive:
+      rules:
+        - name: var-naming
+        - name: indent-error-flow
+        - name: early-return
+        - name: superfluous-else
+        - name: unused-parameter
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: error-return
+        - name: error-naming
+        - name: errorf
+        - name: receiver-naming
+        - name: unexported-return
+        - name: unreachable-code
+        - name: time-naming
+        - name: blank-imports
+        - name: dot-imports
+        - name: empty-block
+        - name: redefines-builtin-id
+    funlen:
+      lines: 50
+      statements: 40
+    gocognit:
+      min-complexity: 15
+    nestif:
+      min-complexity: 4
+    exhaustive:
+      default-signifies-exhaustive: true
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - funlen
+          - wrapcheck
+          - gochecknoglobals
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/your-org/sport-grid

@@ -3,22 +3,22 @@ package app
 import (
 	"context"
 
-	"sport-grid-be/pkg/auth"
-	"sport-grid-be/pkg/bracket"
-	"sport-grid-be/pkg/client"
-	"sport-grid-be/pkg/config"
-	"sport-grid-be/pkg/controller"
-	"sport-grid-be/pkg/court"
-	"sport-grid-be/pkg/division"
-	"sport-grid-be/pkg/match"
-	"sport-grid-be/pkg/player"
-	"sport-grid-be/pkg/registration"
-	"sport-grid-be/pkg/seeding"
-	"sport-grid-be/pkg/sport"
-	"sport-grid-be/pkg/storage/postgres"
-	"sport-grid-be/pkg/team"
-	"sport-grid-be/pkg/tournament"
-	"sport-grid-be/pkg/user"
+	"sport-grid-be/internal/auth"
+	bracketsvc "sport-grid-be/internal/bracket/service"
+	"sport-grid-be/internal/client"
+	"sport-grid-be/internal/config"
+	"sport-grid-be/internal/court"
+	"sport-grid-be/internal/division"
+	"sport-grid-be/internal/match"
+	"sport-grid-be/internal/player"
+	registrationSvc "sport-grid-be/internal/registration/service"
+	"sport-grid-be/internal/seeding"
+	sportsvc "sport-grid-be/internal/sport/service"
+	"sport-grid-be/internal/storage/postgres"
+	"sport-grid-be/internal/team"
+	"sport-grid-be/internal/tournament"
+	controller "sport-grid-be/internal/transport/http"
+	usersvc "sport-grid-be/internal/user/service"
 
 	db "github.com/imsab23/platform-be/infra/storage/postgres"
 	logger "github.com/imsab23/platform-be/observability/logging"
@@ -46,7 +46,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 		return nil, err
 	}
 
-	userSvc, err := user.NewService(database)
+	userSvc, err := usersvc.NewService(database)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 		return nil, err
 	}
 
-	sportSvc, err := sport.NewService(database)
+	sportSvc, err := sportsvc.NewService(database)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 		return nil, err
 	}
 
-	registrationSvc, err := registration.NewService(database, tournamentSvc, divisionSvc)
+	registrationSvc, err := registrationSvc.NewService(database, tournamentSvc, divisionSvc)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func NewServer(ctx context.Context) (*Server, error) {
 		return nil, err
 	}
 
-	bracketSvc, err := bracket.NewService(database, divisionSvc, tournamentSvc, seedingSvc)
+	bracketSvc, err := bracketsvc.NewService(database, divisionSvc, tournamentSvc, seedingSvc)
 	if err != nil {
 		return nil, err
 	}
